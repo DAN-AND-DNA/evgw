@@ -7,6 +7,7 @@ import (
 
 type Evlop struct {
 	m_iEpollFd int
+	m_iWakeFd  int
 	m_stIn     []byte
 	m_stConns  []realConn
 }
@@ -20,11 +21,26 @@ func newEvlop(numConns int, numInBuf int) (error, *Evlop) {
 		return err, nil
 	}
 
+	eventFd, _, e0 := syscall.Syscall(syscall.SYS_EVENTFD2, 0, 0, 0)
+	if e0 != 0 {
+		syscall.Close(epollFd)
+		panic(err)
+	}
+
+	wakeFd := (int)(eventFd)
+	syscall.EpollCtl(epollFd, syscall.EPOLL_CTL_ADD, wakeFd, &syscall.EpollEvent{Fd: (int32)(wakeFd), Events: syscall.EPOLLIN})
+
 	return nil, &Evlop{
 		m_iEpollFd: epollFd,
+		m_iWakeFd:  wakeFd,
 		m_stConns:  make([]realConn, numConns),
 		m_stIn:     make([]byte, numInBuf+1),
 	}
+}
+
+func (this *Evlop) wake() error {
+	_, err := syscall.Write(this.m_iWakeFd, []byte{0, 0, 0, 0, 0, 0, 0, 1})
+	return err
 }
 
 func (this *Evlop) doClose() error {
@@ -61,10 +77,6 @@ func (this *Evlop) addConn(conn realConn) bool {
 }
 
 func (this *Evlop) enableAll(pstConn *realConn) error {
-	if pstConn.m_stStatus != Accepted {
-		return errors.New("unaccepted conn")
-	}
-
 	op := syscall.EPOLL_CTL_ADD
 	fd := pstConn.m_iFd
 	if pstConn.m_iFiredEvents == 0 {
@@ -77,10 +89,6 @@ func (this *Evlop) enableAll(pstConn *realConn) error {
 }
 
 func (this *Evlop) enableRead(pstConn *realConn) error {
-	if pstConn.m_stStatus != Accepted {
-		return errors.New("unaccepted conn")
-	}
-
 	op := syscall.EPOLL_CTL_ADD
 	fd := pstConn.m_iFd
 	if pstConn.m_iFiredEvents == 0 {
@@ -93,10 +101,6 @@ func (this *Evlop) enableRead(pstConn *realConn) error {
 }
 
 func (this *Evlop) enableWrite(pstConn *realConn) error {
-	if pstConn.m_stStatus != Accepted {
-		return errors.New("unaccepted conn")
-	}
-
 	op := syscall.EPOLL_CTL_ADD
 	fd := pstConn.m_iFd
 	if pstConn.m_iFiredEvents == 0 {
@@ -109,25 +113,17 @@ func (this *Evlop) enableWrite(pstConn *realConn) error {
 }
 
 func (this *Evlop) disableAll(pstConn *realConn) error {
-	if pstConn.m_stStatus != Accepted {
-		return errors.New("unaccepted conn")
-	}
-
 	fd := pstConn.m_iFd
 	if pstConn.m_iFiredEvents == 0 {
 		return nil
 	} else {
 		op := syscall.EPOLL_CTL_DEL
 		pstConn.m_iFiredEvents = 0
-		return syscall.EpollCtl(this.m_iEpollFd, op, fd, &syscall.EpollEvent{Fd: (int32)(fd), Events: syscall.EPOLLOUT})
+		return syscall.EpollCtl(this.m_iEpollFd, op, fd, &syscall.EpollEvent{Fd: (int32)(fd), Events: 0})
 	}
 }
 
 func (this *Evlop) disableRead(pstConn *realConn) error {
-	if pstConn.m_stStatus != Accepted {
-		return errors.New("unaccepted conn")
-	}
-
 	fd := pstConn.m_iFd
 	if pstConn.m_iFiredEvents == 0 {
 		return nil
@@ -142,10 +138,6 @@ func (this *Evlop) disableRead(pstConn *realConn) error {
 }
 
 func (this *Evlop) disableWrite(pstConn *realConn) error {
-	if pstConn.m_stStatus != Accepted {
-		return errors.New("unaccepted conn")
-	}
-
 	fd := pstConn.m_iFd
 	if pstConn.m_iFiredEvents == 0 {
 		return nil

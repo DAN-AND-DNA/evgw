@@ -21,10 +21,9 @@ type Conn interface {
 }
 
 type realConn struct {
-	m_iFd    int
-	m_stOut  []byte
-	m_stCurr []byte
-	//	m_stIn         []byte
+	m_iFd          int
+	m_stOut        []byte
+	m_stCurr       []byte
 	m_pstLoop      *Evlop
 	m_iFiredEvents int
 	m_stStatus     Status
