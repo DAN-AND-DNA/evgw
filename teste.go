@@ -23,7 +23,21 @@ func main() {
 		if err == nil {
 			log.Printf("normal closed")
 		} else {
-			log.Printf("close:%v", err)
+			log.Printf("abnormal closed:%v", err)
+		}
+		return
+	}
+
+	Config.Data = func(c evnet.Conn, in []byte, out *([]byte)) (action evnet.Action) {
+		log.Printf("get msg:%s", string(in))
+		length := len(in)
+		leftLength := len(*out)
+
+		if leftLength >= length {
+			copy(*out, in)
+			*out = (*out)[length:]
+		} else {
+
 		}
 		return
 	}

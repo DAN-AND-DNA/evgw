@@ -19,7 +19,7 @@ type Evs struct {
 	Serving      func() (action Action)
 	Opened       func(c Conn, out []byte) (action Action)
 	Closed       func(c Conn, err error) (action Action)
-	Data         func(c Conn, in []byte, out []byte) (action Action)
+	Data         func(c Conn, in []byte, out *([]byte)) (action Action)
 }
 
 func NewConfig() Evs {
@@ -251,10 +251,11 @@ func (this *Evnet) loopRead(pstEvlop *Evlop, pstConn *realConn) error {
 
 	if this.m_stEvents.Data != nil {
 		in := pstEvlop.m_stIn[:n]
-		action := this.m_stEvents.Data(pstConn, in, pstConn.m_stCurr)
+		action := this.m_stEvents.Data(pstConn, in, &(pstConn.m_stCurr))
 		_ = action
 
 		if len(pstConn.m_stOut)-len(pstConn.m_stCurr) != 0 {
+			log.Println("heheh")
 			pstEvlop.enableWrite(pstConn)
 		}
 	}
